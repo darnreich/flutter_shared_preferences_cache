@@ -1,6 +1,7 @@
 # shared_preferences_cache
 
-A Cache for Flutter based on Shared Preferences. It is similar to the package flutter_cache_manager
+A Cache for Flutter based on Shared Preferences. It is similar to the package
+[flutter_cache_manager](https://pub.dev/packages/flutter_cache_manager)
 but instead of caching cache downloaded files, shared_preferences_cache can cache plain values
 (int, double, string, bool). This comes in handy if you want to cache a result of an expensive
 operation or of an API call which cannot be cached with flutter_cache_manager.
