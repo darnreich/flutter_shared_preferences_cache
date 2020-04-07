@@ -25,6 +25,23 @@ void main() {
     await spc.clear();
   });
 
+  test('Simple usage', () async {
+    Future<int> Function() heavyFunction = () async {
+      // This code will only be executed if...
+      // 1. No value for the given key exists in the cache
+      // or
+      // 2. The cached value is older then the provided maxAge (5 days in this example)
+      print('Doing some heavy calculations');
+      return 42;
+    };
+
+    //Cache miss, trigger calculation
+    print(await spc.getInt('the_answer', heavyFunction));
+
+    //Cache is used
+    print(await spc.getInt('the_answer', heavyFunction));
+  });
+
   test('writing, getting and removing values', () async {
     String res = await spc.getString(key, () async {
       countFuncCalled++;

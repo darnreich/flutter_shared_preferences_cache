@@ -16,15 +16,22 @@ To use this plugin, add `shared_preferences_cache` as a
 import 'package:shared_preferences_cache/shared_preferences_cache.dart';
 
 void main() async {
-    SharedPreferencesCache spc = await SharedPreferencesCache.getInstance(Duration(days: 5));
+      SharedPreferencesCache spc =
+          await SharedPreferencesCache.getInstance(Duration(minutes: 5));
 
-    String myCachedValue = await spc.getString(key, () {
-      // This code will only be executed if...
-      // 1. No value for the given key exists in the cache
-      // or
-      // 2. The cached value is older then the provided maxAge (5 days in this example)
-      return someExpensiveOperation();
-    });
+      Future<int> Function() heavyFunction = () async {
+        // This code will only be executed if...
+        // 1. No value for the given key exists in the cache
+        // or
+        // 2. The cached value is older then the provided maxAge (5 days in this example)
+
+        print('Doing some heavy calculations');
+        return 42;
+      };
+
+      print(await spc.getInt('the_answer', heavyFunction));
+      sleep(Duration(seconds: 1));
+      print(await spc.getInt('the_answer', heavyFunction));
 }
 ```
 

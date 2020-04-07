@@ -1,6 +1,7 @@
 name: shared_preferences_cache
-description: A Cache based on Shared Preferences
-version: 0.1.0
+description: A Cache for Flutter based on Shared Preferences to cache results of heavy calcuations
+  of API calls.
+version: 0.1.0+1
 homepage: https://github.com/darnreich/flutter_shared_preferences_cache
 
 environment:
