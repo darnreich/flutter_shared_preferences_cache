@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_cache/shared_preferences_cache.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_platform_interface.dart';
 
@@ -25,14 +26,14 @@ void main() {
   });
 
   test('writing, getting and removing values', () async {
-    String res = await spc.getString(key, () {
+    String res = await spc.getString(key, () async {
       countFuncCalled++;
       return value;
     });
     expect(res, value);
     expect(countFuncCalled, 1);
 
-    res = await spc.getString(key, () {
+    res = await spc.getString(key, () async {
       countFuncCalled++;
       return otherValue;
     });
@@ -41,7 +42,7 @@ void main() {
 
     await spc.remove(key);
 
-    res = await spc.getString(key, () {
+    res = await spc.getString(key, () async {
       countFuncCalled++;
       return otherValue;
     });
@@ -49,15 +50,15 @@ void main() {
     expect(countFuncCalled, 2);
   });
 
-  test('eviction', () async {
-    String res = await spc.getString(key, () {
+  test('eviction policy', () async {
+    String res = await spc.getString(key, () async {
       countFuncCalled++;
       return value;
     });
     expect(res, value);
     expect(countFuncCalled, 1);
 
-    res = await spc.getString(key, () {
+    res = await spc.getString(key, () async {
       countFuncCalled++;
       return otherValue;
     });
@@ -66,12 +67,49 @@ void main() {
 
     sleep(Duration(milliseconds: 200));
 
-    res = await spc.getString(key, () {
+    res = await spc.getString(key, () async {
       countFuncCalled++;
       return otherValue;
     });
     expect(res, otherValue);
     expect(countFuncCalled, 2);
+  });
+
+  test('clear', () async {
+    SharedPreferences sp = await SharedPreferences.getInstance();
+    await sp.setString('foo', 'bar');
+
+    await spc.getString(key, () async => value);
+
+    expect(sp.containsKey('foo'), true);
+    expect(spc.containsKey('foo'), false);
+
+    expect(spc.containsKey(key), true);
+    expect(sp.containsKey(SharedPreferencesCache.VALUE_PREFIX + key), true);
+    expect(sp.containsKey(SharedPreferencesCache.TS_PREFIX + key), true);
+
+    await spc.clear();
+
+    expect(sp.containsKey('foo'), true);
+    expect(spc.containsKey('foo'), false);
+
+    expect(spc.containsKey(key), false);
+    expect(sp.containsKey(SharedPreferencesCache.VALUE_PREFIX + key), false);
+    expect(sp.containsKey(SharedPreferencesCache.TS_PREFIX + key), false);
+  });
+
+  test('remove', () async {
+    SharedPreferences sp = await SharedPreferences.getInstance();
+    await spc.getString(key, () async => value);
+    expect(spc.containsKey(key), true);
+    expect(sp.containsKey(SharedPreferencesCache.VALUE_PREFIX + key), true);
+    expect(sp.containsKey(SharedPreferencesCache.TS_PREFIX + key), true);
+
+    await spc.remove(key);
+
+    expect(spc.containsKey(key), false);
+    expect(sp.containsKey(SharedPreferencesCache.VALUE_PREFIX + key), false);
+    expect(sp.containsKey(SharedPreferencesCache.TS_PREFIX + key), false);
   });
 }
 

@@ -1,14 +1,19 @@
 library shared_preferences_cache;
 
 import 'dart:async';
+import 'dart:math';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SharedPreferencesCache {
+  static const String VALUE_PREFIX = 'spc_val_';
   static const String TS_PREFIX = 'spc_ts_';
 
   SharedPreferences _sharedPreferences;
   static SharedPreferencesCache _instance;
+
+  static final Random random = Random();
+  static const double evictChance = 0.05;
 
   Duration _maxAge;
 
@@ -21,7 +26,13 @@ class SharedPreferencesCache {
     } else {
       _instance._maxAge = maxAge;
     }
-    _instance.evict();
+    if (random.nextDouble() < evictChance) {
+      // Eviction will only be executed every so ofter (based on evictChance)
+      // This is a work-around to avoid race conditions if getInstance() is
+      // called multiple times at roughly the same time.
+      _instance.evict();
+    }
+
     return _instance;
   }
 
@@ -31,50 +42,56 @@ class SharedPreferencesCache {
       String k = keys[i];
       if (k.startsWith(TS_PREFIX)) {
         int tsWritten = _sharedPreferences.getInt(k);
-        if (_isTimestampExpired(tsWritten)) {
+        if (tsWritten != null && _isTimestampExpired(tsWritten)) {
           await this.remove(k.substring(TS_PREFIX.length));
         }
       }
     }
   }
 
-  Future<bool> clear() => _sharedPreferences.clear();
-
-  bool containsKey(String key) => _sharedPreferences.containsKey(key);
-
-  Future<bool> getBool(String key, bool Function() f) async {
-    if (!containsKey(key) || _isKeyExpired(key)) {
-      await _setBool(key, f());
+  Future<void> clear() async {
+    List<String> keys = getKeys().toList();
+    for (int i = 0; i < keys.length; i++) {
+      await _sharedPreferences.remove(keys[i]);
     }
-    return _sharedPreferences.getBool(key);
   }
 
-  Future<double> getDouble(String key, double Function() f) async {
+  bool containsKey(String key) =>
+      _sharedPreferences.containsKey(_getValueKey(key));
+
+  Future<bool> getBool(String key, Future<bool> Function() f) async {
     if (!containsKey(key) || _isKeyExpired(key)) {
-      await _setDouble(key, f());
+      await _setBool(key, await f());
     }
-    return _sharedPreferences.getDouble(key);
+    return _sharedPreferences.getBool(_getValueKey(key));
   }
 
-  Future<int> getInt(String key, int Function() f) async {
+  Future<double> getDouble(String key, Future<double> Function() f) async {
     if (!containsKey(key) || _isKeyExpired(key)) {
-      await _setInt(key, f());
+      await _setDouble(key, await f());
     }
-    return _sharedPreferences.getInt(key);
+    return _sharedPreferences.getDouble(_getValueKey(key));
   }
 
-  Future<String> getString(String key, String Function() f) async {
+  Future<int> getInt(String key, Future<int> Function() f) async {
     if (!containsKey(key) || _isKeyExpired(key)) {
-      await _setString(key, f());
+      await _setInt(key, await f());
     }
-    return _sharedPreferences.getString(key);
+    return _sharedPreferences.getInt(_getValueKey(key));
   }
 
-  Set<String> getKeys({bool includeTimestampKeys = false}) {
-    bool Function(String k) testFunction = includeTimestampKeys
-        ? (String k) => true
-        : (String k) => !k.startsWith(TS_PREFIX);
-    return _sharedPreferences.getKeys().where(testFunction).toSet();
+  Future<String> getString(String key, Future<String> Function() f) async {
+    if (!containsKey(key) || _isKeyExpired(key)) {
+      await _setString(key, await f());
+    }
+    return _sharedPreferences.getString(_getValueKey(key));
+  }
+
+  Set<String> getKeys() {
+    return _sharedPreferences
+        .getKeys()
+        .where((k) => k.startsWith(VALUE_PREFIX) || k.startsWith(TS_PREFIX))
+        .toSet();
   }
 
   Future<void> reload() async {
@@ -84,27 +101,31 @@ class SharedPreferencesCache {
 
   Future<bool> remove(String key) async {
     await _sharedPreferences.remove(_getTimestampKey(key));
-    return _sharedPreferences.remove(key);
+    return _sharedPreferences.remove(_getValueKey(key));
   }
 
   Future<bool> _setBool(String key, bool value) async {
     await _setTimeStampForKey(key);
-    return _sharedPreferences.setBool(key, value);
+    return _sharedPreferences.setBool(_getValueKey(key), value);
   }
 
   Future<bool> _setDouble(String key, double value) async {
     await _setTimeStampForKey(key);
-    return _sharedPreferences.setDouble(key, value);
+    return _sharedPreferences.setDouble(_getValueKey(key), value);
   }
 
   Future<bool> _setInt(String key, int value) async {
     await _setTimeStampForKey(key);
-    return _sharedPreferences.setInt(key, value);
+    return _sharedPreferences.setInt(_getValueKey(key), value);
   }
 
   Future<bool> _setString(String key, String value) async {
     await _setTimeStampForKey(key);
-    return _sharedPreferences.setString(key, value);
+    return _sharedPreferences.setString(_getValueKey(key), value);
+  }
+
+  String _getValueKey(String forKey) {
+    return VALUE_PREFIX + forKey;
   }
 
   String _getTimestampKey(String forKey) {
